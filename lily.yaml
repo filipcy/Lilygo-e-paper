@@ -1,0 +1,687 @@
+substitutions:
+  device: lilygo47
+  name: "Lilygo 47"
+
+esphome:
+  name: ${device}
+  friendly_name: ${name}
+
+  on_boot:
+    priority: -100
+    then:
+      - delay: 35s
+      - script.execute: guarded_display_refresh
+
+  platformio_options:
+    upload_speed: 921600
+    monitor_speed: 115200
+    board_build.mcu: esp32s3
+    board_build.f_cpu: 240000000L
+    board_build.arduino.memory_type: qspi_opi
+    board_build.flash_size: 16MB
+    board_build.flash_mode: qio
+    board_build.flash_type: qspi
+    board_build.psram_type: opi
+    board_build.memory_type: qspi_opi
+    board_build.boot_freq: 80m
+    build_flags:
+      - "-DBOARD_HAS_PSRAM"
+      - "-DARDUINO_USB_CDC_ON_BOOT=1"
+      - "-mfix-esp32-psram-cache-issue"
+    libraries:
+      - SPI
+
+esp32:
+  variant: esp32s3
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+    sdkconfig_options:
+      CONFIG_SPIRAM: "y"
+      CONFIG_SPIRAM_MODE_OCT: "y"
+      CONFIG_SPIRAM_SPEED_80M: "y"
+      CONFIG_SPIRAM_USE_MALLOC: "y"
+      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "16384"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      CONFIG_ESP32S3_SPIRAM_SUPPORT: "y"
+      CONFIG_SPIRAM_BOOT_INIT: "y"
+      CONFIG_SPIRAM_IGNORE_NOTFOUND: "n"
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  manual_ip:
+    static_ip: 192.168.20.244
+    gateway: 192.168.20.1
+    subnet: 255.255.255.0
+
+  ap:
+    ssid: "lilygo47-fallback"
+    password: !secret lilygo_fallback_password
+
+api:
+  port: 6053
+  reboot_timeout: 0s
+  encryption:
+    key: !secret lilygo_api_key
+
+ota:
+  - platform: esphome
+
+captive_portal:
+
+external_components:
+  - source: github://hbast/esphome-lilygo-t547plus_esphome-2025.11
+    components: ["t547"]
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time:
+      - seconds: 0
+        minutes: 0
+        then:
+          - script.execute: guarded_display_refresh
+
+globals:
+  - id: display_refresh_lock
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+script:
+  - id: guarded_display_refresh
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(display_refresh_lock);'
+          then:
+            - logger.log: "Display refresh START"
+            - lambda: 'id(display_refresh_lock) = true;'
+            - component.update: t5_display
+            - logger.log: "Display refresh END"
+            - delay: 8s
+            - lambda: 'id(display_refresh_lock) = false;'
+            - logger.log: "Display refresh UNLOCK"
+
+button:
+  - platform: template
+    name: "Refresh display"
+    id: refresh_display_btn
+    on_press:
+      - script.execute: guarded_display_refresh
+
+sensor:
+  - platform: homeassistant
+    id: temp_zewn
+    entity_id: sensor.0x54ef441001508d33_temperature
+    accuracy_decimals: 2
+
+  - platform: homeassistant
+    id: temp_wewn
+    entity_id: sensor.czujnik_temperatury_temperature
+    accuracy_decimals: 2
+
+  - platform: homeassistant
+    id: pralka_time_left
+    entity_id: sensor.washing_machine_time_to_finish_min
+
+  - platform: homeassistant
+    id: zmywarka_time_left
+    entity_id: sensor.dishwasher_time_to_finish_min
+
+  - platform: homeassistant
+    id: car_range
+    entity_id: sensor.we1gp42_range_liquid
+
+  - platform: homeassistant
+    id: klima_target_temp
+    entity_id: climate.as35s2sf1fa_wh
+    attribute: temperature
+
+  - platform: homeassistant
+    id: podloga_target_temp
+    entity_id: climate.lazienka
+    attribute: temperature
+
+  - platform: homeassistant
+    id: owm_daily_1_max
+    entity_id: sensor.owm_daily_1_max
+  - platform: homeassistant
+    id: owm_daily_1_min
+    entity_id: sensor.owm_daily_1_min
+  - platform: homeassistant
+    id: owm_daily_2_max
+    entity_id: sensor.owm_daily_2_max
+  - platform: homeassistant
+    id: owm_daily_2_min
+    entity_id: sensor.owm_daily_2_min
+  - platform: homeassistant
+    id: owm_daily_3_max
+    entity_id: sensor.owm_daily_3_max
+  - platform: homeassistant
+    id: owm_daily_3_min
+    entity_id: sensor.owm_daily_3_min
+  - platform: homeassistant
+    id: owm_daily_4_max
+    entity_id: sensor.owm_daily_4_max
+  - platform: homeassistant
+    id: owm_daily_4_min
+    entity_id: sensor.owm_daily_4_min
+
+  - platform: homeassistant
+    id: owm_hourly_1_temp
+    entity_id: sensor.owm_hourly_1_temp
+  - platform: homeassistant
+    id: owm_hourly_2_temp
+    entity_id: sensor.owm_hourly_2_temp
+  - platform: homeassistant
+    id: owm_hourly_3_temp
+    entity_id: sensor.owm_hourly_3_temp
+  - platform: homeassistant
+    id: owm_hourly_4_temp
+    entity_id: sensor.owm_hourly_4_temp
+
+  - platform: homeassistant
+    id: owm_rain_today
+    entity_id: sensor.owm_rain_today
+
+  - platform: homeassistant
+    id: owm_rain_probability_today
+    entity_id: sensor.owm_rain_probability_today
+
+text_sensor:
+  - platform: homeassistant
+    id: budzik_raw
+    entity_id: sensor.garmin_connect_next_alarm_time
+
+  - platform: homeassistant
+    id: klima_state
+    entity_id: climate.as35s2sf1fa_wh
+
+  - platform: homeassistant
+    id: podloga_state
+    entity_id: climate.lazienka
+
+  - platform: homeassistant
+    id: owm_daily_1_condition
+    entity_id: sensor.owm_daily_1_condition
+  - platform: homeassistant
+    id: owm_daily_2_condition
+    entity_id: sensor.owm_daily_2_condition
+  - platform: homeassistant
+    id: owm_daily_3_condition
+    entity_id: sensor.owm_daily_3_condition
+  - platform: homeassistant
+    id: owm_daily_4_condition
+    entity_id: sensor.owm_daily_4_condition
+
+  - platform: homeassistant
+    id: owm_daily_1_day
+    entity_id: sensor.owm_daily_1_day
+  - platform: homeassistant
+    id: owm_daily_2_day
+    entity_id: sensor.owm_daily_2_day
+  - platform: homeassistant
+    id: owm_daily_3_day
+    entity_id: sensor.owm_daily_3_day
+  - platform: homeassistant
+    id: owm_daily_4_day
+    entity_id: sensor.owm_daily_4_day
+
+  - platform: homeassistant
+    id: owm_hourly_1_time
+    entity_id: sensor.owm_hourly_1_time
+  - platform: homeassistant
+    id: owm_hourly_2_time
+    entity_id: sensor.owm_hourly_2_time
+  - platform: homeassistant
+    id: owm_hourly_3_time
+    entity_id: sensor.owm_hourly_3_time
+  - platform: homeassistant
+    id: owm_hourly_4_time
+    entity_id: sensor.owm_hourly_4_time
+
+  - platform: homeassistant
+    id: owm_hourly_1_condition
+    entity_id: sensor.owm_hourly_1_condition
+  - platform: homeassistant
+    id: owm_hourly_2_condition
+    entity_id: sensor.owm_hourly_2_condition
+  - platform: homeassistant
+    id: owm_hourly_3_condition
+    entity_id: sensor.owm_hourly_3_condition
+  - platform: homeassistant
+    id: owm_hourly_4_condition
+    entity_id: sensor.owm_hourly_4_condition
+
+  - platform: homeassistant
+    id: next_rising_local
+    entity_id: sensor.sun_next_rising_local
+
+  - platform: homeassistant
+    id: next_setting_local
+    entity_id: sensor.sun_next_setting_local
+
+font:
+  - file: "gfonts://Roboto@700"
+    id: font_header_date
+    size: 34
+
+  - file: "gfonts://Roboto@500"
+    id: font_header_meta
+    size: 18
+
+  - file: "gfonts://Roboto@700"
+    id: font_section
+    size: 25
+
+  - file: "gfonts://Roboto@700"
+    id: font_temp_main
+    size: 66
+
+  - file: "gfonts://Roboto@700"
+    id: font_temp_inside
+    size: 60
+
+  - file: "gfonts://Roboto@500"
+    id: font_temp_sub
+    size: 24
+
+  - file: "gfonts://Roboto@700"
+    id: font_label_big
+    size: 22
+
+  - file: "gfonts://Roboto@500"
+    id: font_forecast_day
+    size: 21
+
+  - file: "gfonts://Roboto@700"
+    id: font_forecast_temp
+    size: 21
+
+  - file: "gfonts://Roboto@500"
+    id: font_hour_time
+    size: 19
+
+  - file: "gfonts://Roboto@700"
+    id: font_hour_temp
+    size: 24
+
+  - file: "gfonts://Roboto@700"
+    id: font_event_value
+    size: 21
+
+  - file: "gfonts://Roboto@500"
+    id: font_event_label
+    size: 18
+
+  - file: "gfonts://Roboto@500"
+    id: font_footer
+    size: 19
+
+  - file: "materialdesignicons-webfont.ttf"
+    id: mdi_36
+    size: 36
+    glyphsets: []
+    ignore_missing_glyphs: true
+    glyphs:
+      - "\U000F0020" # alarm
+      - "\U000F0717" # snowflake
+      - "\U000F072A" # washing-machine
+      - "\U000F1A9A" # heat-wave
+      - "\U000F0599" # weather-sunny
+      - "\U000F0594" # moon
+      - "\U000F054B" # umbrella
+      - "\U000F010B" # car
+      - "\U000F0590" # weather-cloudy
+      - "\U000F0595" # weather-partly-cloudy
+      - "\U000F0597" # weather-rainy
+      - "\U000F0591" # weather-fog
+      - "\U000F067E" # weather-lightning
+      - "\U000F0598" # weather-sunset-down
+      - "\U000F02DC" # home
+      - "\U000F0150" # clock-outline
+      - "\U000F0F38" # home-thermometer-outline
+      - "\U000F0AAC" # dishwasher
+
+  - file: "materialdesignicons-webfont.ttf"
+    id: mdi_48
+    size: 48
+    glyphsets: []
+    ignore_missing_glyphs: true
+    glyphs:
+      - "\U000F0599"
+      - "\U000F0594"
+      - "\U000F054B"
+      - "\U000F0590"
+      - "\U000F0595"
+      - "\U000F0597"
+      - "\U000F0591"
+      - "\U000F067E"
+      - "\U000F0717"
+      - "\U000F0F38"
+      - "\U000F02DC"
+      - "\U000F1C63"
+
+display:
+  - platform: t547
+    id: t5_display
+    update_interval: never
+    lambda: |-
+      it.fill(Color::BLACK);
+
+      auto now = id(homeassistant_time).now();
+
+      auto is_valid_text = [](const std::string &s) -> bool {
+        return !s.empty() && s != "unknown" && s != "unavailable" && s != "None";
+      };
+
+      auto normalize_alarm = [](std::string s) -> std::string {
+        if (s.size() >= 16 && s[10] == 'T') return s.substr(11, 5);
+        if (s.size() >= 5 && s.find(":") != std::string::npos) return s.substr(0, 5);
+        return s;
+      };
+
+      auto climate_on = [&](const std::string &s) -> bool {
+        return is_valid_text(s) && s != "off";
+      };
+
+      auto dow_pl = [&](int d) -> const char * {
+        switch (d) {
+          case 1: return "Niedziela";
+          case 2: return "Poniedzialek";
+          case 3: return "Wtorek";
+          case 4: return "Sroda";
+          case 5: return "Czwartek";
+          case 6: return "Piatek";
+          case 7: return "Sobota";
+          default: return "";
+        }
+      };
+
+      auto day_short_pl = [&](std::string s) -> const char * {
+        if (s == "Mon") return "Pon";
+        if (s == "Tue") return "Wt";
+        if (s == "Wed") return "Sr";
+        if (s == "Thu") return "Czw";
+        if (s == "Fri") return "Pt";
+        if (s == "Sat") return "Sob";
+        if (s == "Sun") return "Nie";
+        return "---";
+      };
+
+      auto cond_to_icon_daily = [&](std::string c) -> const char * {
+        if (c == "sunny") return "\U000F0599";
+        if (c == "clear-night") return "\U000F0594";
+        if (c == "partlycloudy") return "\U000F0595";
+        if (c == "cloudy") return "\U000F0590";
+        if (c == "fog") return "\U000F0591";
+        if (c == "rainy") return "\U000F0597";
+        if (c == "pouring") return "\U000F054B";
+        if (c == "snowy") return "\U000F0717";
+        if (c == "snowy-rainy") return "\U000F0717";
+        if (c == "lightning") return "\U000F067E";
+        if (c == "lightning-rainy") return "\U000F067E";
+        if (c == "hail") return "\U000F054B";
+        if (c == "windy") return "\U000F0590";
+        if (c == "windy-variant") return "\U000F0595";
+        return "\U000F0590";
+      };
+
+      auto cond_to_icon_hourly = [&](std::string c) -> const char * {
+        if (c == "sunny") return "\U000F0599";
+        if (c == "clear-night") return "\U000F0594";
+        if (c == "partlycloudy") return "\U000F0595";
+        if (c == "cloudy") return "\U000F0590";
+        if (c == "fog") return "\U000F0591";
+        if (c == "rainy") return "\U000F0597";
+        if (c == "pouring") return "\U000F054B";
+        if (c == "snowy") return "\U000F0717";
+        if (c == "snowy-rainy") return "\U000F0717";
+        if (c == "lightning") return "\U000F067E";
+        if (c == "lightning-rainy") return "\U000F067E";
+        if (c == "hail") return "\U000F054B";
+        if (c == "windy") return "\U000F0590";
+        if (c == "windy-variant") return "\U000F0595";
+        return "\U000F0590";
+      };
+
+      auto draw_stat_item = [&](int cx, int y, const char *icon, const char *label, const char *value) {
+        it.print(cx, y, id(mdi_36), Color::WHITE, TextAlign::TOP_CENTER, icon);
+        it.print(cx, y + 34, id(font_event_label), Color::WHITE, TextAlign::TOP_CENTER, label);
+        it.print(cx, y + 58, id(font_event_value), Color::WHITE, TextAlign::TOP_CENTER, value);
+      };
+
+      const char *d1_icon = cond_to_icon_daily(id(owm_daily_1_condition).state);
+      const char *d2_icon = cond_to_icon_daily(id(owm_daily_2_condition).state);
+      const char *d3_icon = cond_to_icon_daily(id(owm_daily_3_condition).state);
+      const char *d4_icon = cond_to_icon_daily(id(owm_daily_4_condition).state);
+
+      const char *h1_icon = cond_to_icon_hourly(id(owm_hourly_1_condition).state);
+      const char *h2_icon = cond_to_icon_hourly(id(owm_hourly_2_condition).state);
+      const char *h3_icon = cond_to_icon_hourly(id(owm_hourly_3_condition).state);
+      const char *h4_icon = cond_to_icon_hourly(id(owm_hourly_4_condition).state);
+
+      char outside_buf[20];
+      if (!isnan(id(temp_zewn).state)) {
+        snprintf(outside_buf, sizeof(outside_buf), "%.1f°C", id(temp_zewn).state);
+      } else {
+        snprintf(outside_buf, sizeof(outside_buf), "--.-°C");
+      }
+
+      char inside_buf[20];
+      if (!isnan(id(temp_wewn).state)) {
+        snprintf(inside_buf, sizeof(inside_buf), "%.1f°C", id(temp_wewn).state);
+      } else {
+        snprintf(inside_buf, sizeof(inside_buf), "--.-°C");
+      }
+
+      char minmax_buf[24];
+      if (!isnan(id(owm_daily_1_min).state) && !isnan(id(owm_daily_1_max).state)) {
+        snprintf(minmax_buf, sizeof(minmax_buf), "min %.0f°   max %.0f°", id(owm_daily_1_min).state, id(owm_daily_1_max).state);
+      } else {
+        snprintf(minmax_buf, sizeof(minmax_buf), "min --°   max --°");
+      }
+
+      std::string sunrise = is_valid_text(id(next_rising_local).state) ? id(next_rising_local).state : "--:--";
+      std::string sunset  = is_valid_text(id(next_setting_local).state) ? id(next_setting_local).state : "--:--";
+
+      char d1_max[8]; char d1_min[8];
+      char d2_max[8]; char d2_min[8];
+      char d3_max[8]; char d3_min[8];
+      char d4_max[8]; char d4_min[8];
+
+      snprintf(d1_max, sizeof(d1_max), "%d°", isnan(id(owm_daily_1_max).state) ? 0 : (int) id(owm_daily_1_max).state);
+      snprintf(d1_min, sizeof(d1_min), "%d°", isnan(id(owm_daily_1_min).state) ? 0 : (int) id(owm_daily_1_min).state);
+      snprintf(d2_max, sizeof(d2_max), "%d°", isnan(id(owm_daily_2_max).state) ? 0 : (int) id(owm_daily_2_max).state);
+      snprintf(d2_min, sizeof(d2_min), "%d°", isnan(id(owm_daily_2_min).state) ? 0 : (int) id(owm_daily_2_min).state);
+      snprintf(d3_max, sizeof(d3_max), "%d°", isnan(id(owm_daily_3_max).state) ? 0 : (int) id(owm_daily_3_max).state);
+      snprintf(d3_min, sizeof(d3_min), "%d°", isnan(id(owm_daily_3_min).state) ? 0 : (int) id(owm_daily_3_min).state);
+      snprintf(d4_max, sizeof(d4_max), "%d°", isnan(id(owm_daily_4_max).state) ? 0 : (int) id(owm_daily_4_max).state);
+      snprintf(d4_min, sizeof(d4_min), "%d°", isnan(id(owm_daily_4_min).state) ? 0 : (int) id(owm_daily_4_min).state);
+
+      char h1_temp[8]; char h2_temp[8]; char h3_temp[8]; char h4_temp[8];
+      snprintf(h1_temp, sizeof(h1_temp), "%d°", isnan(id(owm_hourly_1_temp).state) ? 0 : (int) id(owm_hourly_1_temp).state);
+      snprintf(h2_temp, sizeof(h2_temp), "%d°", isnan(id(owm_hourly_2_temp).state) ? 0 : (int) id(owm_hourly_2_temp).state);
+      snprintf(h3_temp, sizeof(h3_temp), "%d°", isnan(id(owm_hourly_3_temp).state) ? 0 : (int) id(owm_hourly_3_temp).state);
+      snprintf(h4_temp, sizeof(h4_temp), "%d°", isnan(id(owm_hourly_4_temp).state) ? 0 : (int) id(owm_hourly_4_temp).state);
+
+      std::string alarm = is_valid_text(id(budzik_raw).state) ? normalize_alarm(id(budzik_raw).state) : "--:--";
+
+      char klima_buf[24];
+      if (climate_on(id(klima_state).state) && !isnan(id(klima_target_temp).state)) {
+        snprintf(klima_buf, sizeof(klima_buf), "%.0f°C", id(klima_target_temp).state);
+      } else if (climate_on(id(klima_state).state)) {
+        snprintf(klima_buf, sizeof(klima_buf), "ON");
+      } else {
+        snprintf(klima_buf, sizeof(klima_buf), "OFF");
+      }
+
+      char pralka_buf[24];
+      if (!isnan(id(pralka_time_left).state) && id(pralka_time_left).state > 0) {
+        int mins = (int) id(pralka_time_left).state;
+        if (mins >= 60) {
+          snprintf(pralka_buf, sizeof(pralka_buf), "%dh %02d", mins / 60, mins % 60);
+        } else {
+          snprintf(pralka_buf, sizeof(pralka_buf), "%d min", mins);
+        }
+      } else {
+        snprintf(pralka_buf, sizeof(pralka_buf), "OFF");
+      }
+
+      char zmywarka_buf[24];
+      if (!isnan(id(zmywarka_time_left).state) && id(zmywarka_time_left).state > 0) {
+        int mins = (int) id(zmywarka_time_left).state;
+        if (mins >= 60) {
+          snprintf(zmywarka_buf, sizeof(zmywarka_buf), "%dh %02d", mins / 60, mins % 60);
+        } else {
+          snprintf(zmywarka_buf, sizeof(zmywarka_buf), "%d min", mins);
+        }
+      } else {
+        snprintf(zmywarka_buf, sizeof(zmywarka_buf), "OFF");
+      }
+
+      char floor_buf[24];
+      if (climate_on(id(podloga_state).state) && !isnan(id(podloga_target_temp).state)) {
+        snprintf(floor_buf, sizeof(floor_buf), "%.0f°C", id(podloga_target_temp).state);
+      } else if (climate_on(id(podloga_state).state)) {
+        snprintf(floor_buf, sizeof(floor_buf), "ON");
+      } else {
+        snprintf(floor_buf, sizeof(floor_buf), "OFF");
+      }
+
+      std::string rain_text;
+      if (!isnan(id(owm_rain_today).state) && id(owm_rain_today).state > 0.1f) {
+        char rainbuf[52];
+        snprintf(rainbuf, sizeof(rainbuf), "Opady dzis %.1f mm (%d%%)",
+                 id(owm_rain_today).state,
+                 (int) id(owm_rain_probability_today).state);
+        rain_text = rainbuf;
+      } else if (!isnan(id(owm_rain_probability_today).state)) {
+        char rainbuf[40];
+        snprintf(rainbuf, sizeof(rainbuf), "Szansa deszczu %d%%",
+                 (int) id(owm_rain_probability_today).state);
+        rain_text = rainbuf;
+      } else {
+        rain_text = "Brak danych o opadach";
+      }
+
+      char carbuf[28];
+      if (!isnan(id(car_range).state)) {
+        snprintf(carbuf, sizeof(carbuf), "Zasieg %.0f km", id(car_range).state);
+      } else {
+        snprintf(carbuf, sizeof(carbuf), "Zasieg -- km");
+      }
+
+      // Ramka zewnetrzna
+      it.rectangle(8, 8, 944, 524, Color::WHITE);
+
+      // Header
+      if (now.is_valid()) {
+        it.strftime(28, 20, id(font_header_date), Color::WHITE, TextAlign::TOP_LEFT, "%d.%m", now);
+        it.print(150, 24, id(font_header_meta), Color::WHITE, dow_pl(now.day_of_week));
+
+        char updated_buf[24];
+        snprintf(updated_buf, sizeof(updated_buf), "Odswiezono %02d:%02d", now.hour, now.minute);
+        it.print(918, 26, id(font_header_meta), Color::WHITE, TextAlign::TOP_RIGHT, updated_buf);
+      } else {
+        it.print(28, 20, id(font_header_date), Color::WHITE, "Brak czasu");
+      }
+
+      it.line(24, 70, 928, 70, Color::WHITE);
+
+      // Sekcje glowne
+      it.print(38, 88, id(font_section), Color::WHITE, "Na zewnatrz");
+      it.print(520, 88, id(font_section), Color::WHITE, "W mieszkaniu");
+
+      it.line(472, 92, 472, 320, Color::WHITE);
+
+      // Lewa gora - outdoor
+      it.print(34, 126, id(mdi_48), Color::WHITE, "\U000F02DC");
+      it.print(96, 118, id(font_temp_main), Color::WHITE, outside_buf);
+      it.print(100, 194, id(font_temp_sub), Color::WHITE, minmax_buf);
+
+      // Prawa gora - indoor
+      it.print(520, 126, id(mdi_48), Color::WHITE, "\U000F1C63");
+      it.print(584, 122, id(font_temp_inside), Color::WHITE, inside_buf);
+
+      // Wschod / zachod
+      it.print(528, 204, id(mdi_36), Color::WHITE, "\U000F0599");
+      it.print(570, 208, id(font_label_big), Color::WHITE, sunrise.c_str());
+
+      it.print(706, 204, id(mdi_36), Color::WHITE, "\U000F0594");
+      it.print(748, 208, id(font_label_big), Color::WHITE, sunset.c_str());
+
+      // Forecast daily - lewa dol
+      int fy = 242;
+      it.print(36, fy, id(font_label_big), Color::WHITE, "Kolejne dni");
+
+      it.print(42, 278, id(mdi_36), Color::WHITE, d1_icon);
+      it.print(86, 284, id(font_forecast_day), Color::WHITE, day_short_pl(id(owm_daily_1_day).state));
+      it.print(156, 284, id(font_forecast_temp), Color::WHITE, d1_max);
+      it.print(226, 284, id(font_forecast_temp), Color::WHITE, d1_min);
+
+      it.print(42, 316, id(mdi_36), Color::WHITE, d2_icon);
+      it.print(86, 322, id(font_forecast_day), Color::WHITE, day_short_pl(id(owm_daily_2_day).state));
+      it.print(156, 322, id(font_forecast_temp), Color::WHITE, d2_max);
+      it.print(226, 322, id(font_forecast_temp), Color::WHITE, d2_min);
+
+      it.print(272, 278, id(mdi_36), Color::WHITE, d3_icon);
+      it.print(316, 284, id(font_forecast_day), Color::WHITE, day_short_pl(id(owm_daily_3_day).state));
+      it.print(386, 284, id(font_forecast_temp), Color::WHITE, d3_max);
+      it.print(438, 284, id(font_forecast_temp), Color::WHITE, d3_min);
+
+      it.print(272, 316, id(mdi_36), Color::WHITE, d4_icon);
+      it.print(316, 322, id(font_forecast_day), Color::WHITE, day_short_pl(id(owm_daily_4_day).state));
+      it.print(386, 322, id(font_forecast_temp), Color::WHITE, d4_max);
+      it.print(438, 322, id(font_forecast_temp), Color::WHITE, d4_min);
+
+      // Forecast hourly - prawa dol
+      it.print(520, 246, id(font_label_big), Color::WHITE, "Najblizsze godziny");
+
+      int hx1 = 560;
+      int hx2 = 650;
+      int hx3 = 740;
+      int hx4 = 830;
+
+      it.print(hx1, 282, id(font_hour_time), Color::WHITE, TextAlign::TOP_CENTER, id(owm_hourly_1_time).state.c_str());
+      it.print(hx1, 308, id(mdi_36), Color::WHITE, TextAlign::TOP_CENTER, h1_icon);
+      it.print(hx1, 344, id(font_hour_temp), Color::WHITE, TextAlign::TOP_CENTER, h1_temp);
+
+      it.print(hx2, 282, id(font_hour_time), Color::WHITE, TextAlign::TOP_CENTER, id(owm_hourly_2_time).state.c_str());
+      it.print(hx2, 308, id(mdi_36), Color::WHITE, TextAlign::TOP_CENTER, h2_icon);
+      it.print(hx2, 344, id(font_hour_temp), Color::WHITE, TextAlign::TOP_CENTER, h2_temp);
+
+      it.print(hx3, 282, id(font_hour_time), Color::WHITE, TextAlign::TOP_CENTER, id(owm_hourly_3_time).state.c_str());
+      it.print(hx3, 308, id(mdi_36), Color::WHITE, TextAlign::TOP_CENTER, h3_icon);
+      it.print(hx3, 344, id(font_hour_temp), Color::WHITE, TextAlign::TOP_CENTER, h3_temp);
+
+      it.print(hx4, 282, id(font_hour_time), Color::WHITE, TextAlign::TOP_CENTER, id(owm_hourly_4_time).state.c_str());
+      it.print(hx4, 308, id(mdi_36), Color::WHITE, TextAlign::TOP_CENTER, h4_icon);
+      it.print(hx4, 344, id(font_hour_temp), Color::WHITE, TextAlign::TOP_CENTER, h4_temp);
+
+      // Separator przed statusem
+      it.line(24, 374, 928, 374, Color::WHITE);
+
+      // 5 wycentrowanych statusow bez ramek
+      int stat_y = 392;
+      draw_stat_item(116, stat_y, "\U000F0020", "Budzik", alarm.c_str());
+      draw_stat_item(300, stat_y, "\U000F0717", "Klima", klima_buf);
+      draw_stat_item(484, stat_y, "\U000F072A", "Pralka", pralka_buf);
+      draw_stat_item(668, stat_y, "\U000F0AAC", "Zmywarka", zmywarka_buf);
+      draw_stat_item(852, stat_y, "\U000F1A9A", "Podloga", floor_buf);
+
+      // Stopka
+      it.line(24, 480, 928, 480, Color::WHITE);
+
+      it.print(34, 490, id(mdi_36), Color::WHITE, (!isnan(id(owm_rain_today).state) && id(owm_rain_today).state > 0.1f) ? "\U000F054B" : "\U000F0599");
+      it.print(76, 496, id(font_footer), Color::WHITE, rain_text.c_str());
+
+      it.print(704, 490, id(mdi_36), Color::WHITE, "\U000F010B");
+      it.print(746, 496, id(font_footer), Color::WHITE, carbuf);
