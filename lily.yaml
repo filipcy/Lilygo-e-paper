@@ -128,6 +128,11 @@ sensor:
     accuracy_decimals: 2
 
   - platform: homeassistant
+    id: humidity_wewn
+    entity_id: sensor.czujnik_temperatury_humidity
+    accuracy_decimals: 0
+
+  - platform: homeassistant
     id: pralka_time_left
     entity_id: sensor.washing_machine_time_to_finish_min
 
@@ -335,20 +340,22 @@ font:
       - "\U000F0717" # snowflake
       - "\U000F072A" # washing-machine
       - "\U000F1A9A" # heat-wave
-      - "\U000F0599" # weather-sunny
+      - "\U000F059C" # weather-sunny
       - "\U000F0594" # moon
       - "\U000F054B" # umbrella
-      - "\U000F010B" # car
+      - "\U000F002E" # car
       - "\U000F0590" # weather-cloudy
       - "\U000F0595" # weather-partly-cloudy
       - "\U000F0597" # weather-rainy
       - "\U000F0591" # weather-fog
       - "\U000F067E" # weather-lightning
+      - "\U000F0599" # weather-sunset-up
       - "\U000F0598" # weather-sunset-down
       - "\U000F02DC" # home
       - "\U000F0150" # clock-outline
       - "\U000F0F38" # home-thermometer-outline
       - "\U000F0AAC" # dishwasher
+      - "\U000F1C63" # forest-outline
 
   - file: "materialdesignicons-webfont.ttf"
     id: mdi_48
@@ -356,7 +363,7 @@ font:
     glyphsets: []
     ignore_missing_glyphs: true
     glyphs:
-      - "\U000F0599"
+      - "\U000F059C"
       - "\U000F0594"
       - "\U000F054B"
       - "\U000F0590"
@@ -383,6 +390,12 @@ display:
       };
 
       auto normalize_alarm = [](std::string s) -> std::string {
+        if (s.size() >= 16 && s[10] == 'T') return s.substr(11, 5);
+        if (s.size() >= 5 && s.find(":") != std::string::npos) return s.substr(0, 5);
+        return s;
+      };
+
+      auto normalize_time_only = [&](std::string s) -> std::string {
         if (s.size() >= 16 && s[10] == 'T') return s.substr(11, 5);
         if (s.size() >= 5 && s.find(":") != std::string::npos) return s.substr(0, 5);
         return s;
@@ -417,7 +430,7 @@ display:
       };
 
       auto cond_to_icon_daily = [&](std::string c) -> const char * {
-        if (c == "sunny") return "\U000F0599";
+        if (c == "sunny") return "\U000F059C";
         if (c == "clear-night") return "\U000F0594";
         if (c == "partlycloudy") return "\U000F0595";
         if (c == "cloudy") return "\U000F0590";
@@ -435,7 +448,7 @@ display:
       };
 
       auto cond_to_icon_hourly = [&](std::string c) -> const char * {
-        if (c == "sunny") return "\U000F0599";
+        if (c == "sunny") return "\U000F059C";
         if (c == "clear-night") return "\U000F0594";
         if (c == "partlycloudy") return "\U000F0595";
         if (c == "cloudy") return "\U000F0590";
@@ -482,35 +495,42 @@ display:
         snprintf(inside_buf, sizeof(inside_buf), "--.-°C");
       }
 
-      char minmax_buf[24];
-      if (!isnan(id(owm_daily_1_min).state) && !isnan(id(owm_daily_1_max).state)) {
-        snprintf(minmax_buf, sizeof(minmax_buf), "min %.0f°   max %.0f°", id(owm_daily_1_min).state, id(owm_daily_1_max).state);
+      char humidity_buf[16];
+      if (!isnan(id(humidity_wewn).state)) {
+        snprintf(humidity_buf, sizeof(humidity_buf), "%.0f%% wilg.", id(humidity_wewn).state);
       } else {
-        snprintf(minmax_buf, sizeof(minmax_buf), "min --°   max --°");
+        snprintf(humidity_buf, sizeof(humidity_buf), "--%% wilg.");
       }
 
-      std::string sunrise = is_valid_text(id(next_rising_local).state) ? id(next_rising_local).state : "--:--";
-      std::string sunset  = is_valid_text(id(next_setting_local).state) ? id(next_setting_local).state : "--:--";
+      char minmax_buf[24];
+      if (!isnan(id(owm_daily_1_min).state) && !isnan(id(owm_daily_1_max).state)) {
+        snprintf(minmax_buf, sizeof(minmax_buf), "↓ %.0f°   ↑ %.0f°", id(owm_daily_1_min).state, id(owm_daily_1_max).state);
+      } else {
+        snprintf(minmax_buf, sizeof(minmax_buf), "↓ --°   ↑ --°");
+      }
+
+      std::string sunrise = is_valid_text(id(next_rising_local).state) ? normalize_time_only(id(next_rising_local).state) : "--:--";
+      std::string sunset  = is_valid_text(id(next_setting_local).state) ? normalize_time_only(id(next_setting_local).state) : "--:--";
 
       char d1_max[8]; char d1_min[8];
       char d2_max[8]; char d2_min[8];
       char d3_max[8]; char d3_min[8];
       char d4_max[8]; char d4_min[8];
 
-      snprintf(d1_max, sizeof(d1_max), "%d°", isnan(id(owm_daily_1_max).state) ? 0 : (int) id(owm_daily_1_max).state);
-      snprintf(d1_min, sizeof(d1_min), "%d°", isnan(id(owm_daily_1_min).state) ? 0 : (int) id(owm_daily_1_min).state);
-      snprintf(d2_max, sizeof(d2_max), "%d°", isnan(id(owm_daily_2_max).state) ? 0 : (int) id(owm_daily_2_max).state);
-      snprintf(d2_min, sizeof(d2_min), "%d°", isnan(id(owm_daily_2_min).state) ? 0 : (int) id(owm_daily_2_min).state);
-      snprintf(d3_max, sizeof(d3_max), "%d°", isnan(id(owm_daily_3_max).state) ? 0 : (int) id(owm_daily_3_max).state);
-      snprintf(d3_min, sizeof(d3_min), "%d°", isnan(id(owm_daily_3_min).state) ? 0 : (int) id(owm_daily_3_min).state);
-      snprintf(d4_max, sizeof(d4_max), "%d°", isnan(id(owm_daily_4_max).state) ? 0 : (int) id(owm_daily_4_max).state);
-      snprintf(d4_min, sizeof(d4_min), "%d°", isnan(id(owm_daily_4_min).state) ? 0 : (int) id(owm_daily_4_min).state);
+      if (!isnan(id(owm_daily_1_max).state)) snprintf(d1_max, sizeof(d1_max), "%d°", (int) id(owm_daily_1_max).state); else snprintf(d1_max, sizeof(d1_max), "--°");
+      if (!isnan(id(owm_daily_1_min).state)) snprintf(d1_min, sizeof(d1_min), "%d°", (int) id(owm_daily_1_min).state); else snprintf(d1_min, sizeof(d1_min), "--°");
+      if (!isnan(id(owm_daily_2_max).state)) snprintf(d2_max, sizeof(d2_max), "%d°", (int) id(owm_daily_2_max).state); else snprintf(d2_max, sizeof(d2_max), "--°");
+      if (!isnan(id(owm_daily_2_min).state)) snprintf(d2_min, sizeof(d2_min), "%d°", (int) id(owm_daily_2_min).state); else snprintf(d2_min, sizeof(d2_min), "--°");
+      if (!isnan(id(owm_daily_3_max).state)) snprintf(d3_max, sizeof(d3_max), "%d°", (int) id(owm_daily_3_max).state); else snprintf(d3_max, sizeof(d3_max), "--°");
+      if (!isnan(id(owm_daily_3_min).state)) snprintf(d3_min, sizeof(d3_min), "%d°", (int) id(owm_daily_3_min).state); else snprintf(d3_min, sizeof(d3_min), "--°");
+      if (!isnan(id(owm_daily_4_max).state)) snprintf(d4_max, sizeof(d4_max), "%d°", (int) id(owm_daily_4_max).state); else snprintf(d4_max, sizeof(d4_max), "--°");
+      if (!isnan(id(owm_daily_4_min).state)) snprintf(d4_min, sizeof(d4_min), "%d°", (int) id(owm_daily_4_min).state); else snprintf(d4_min, sizeof(d4_min), "--°");
 
       char h1_temp[8]; char h2_temp[8]; char h3_temp[8]; char h4_temp[8];
-      snprintf(h1_temp, sizeof(h1_temp), "%d°", isnan(id(owm_hourly_1_temp).state) ? 0 : (int) id(owm_hourly_1_temp).state);
-      snprintf(h2_temp, sizeof(h2_temp), "%d°", isnan(id(owm_hourly_2_temp).state) ? 0 : (int) id(owm_hourly_2_temp).state);
-      snprintf(h3_temp, sizeof(h3_temp), "%d°", isnan(id(owm_hourly_3_temp).state) ? 0 : (int) id(owm_hourly_3_temp).state);
-      snprintf(h4_temp, sizeof(h4_temp), "%d°", isnan(id(owm_hourly_4_temp).state) ? 0 : (int) id(owm_hourly_4_temp).state);
+      if (!isnan(id(owm_hourly_1_temp).state)) snprintf(h1_temp, sizeof(h1_temp), "%d°", (int) id(owm_hourly_1_temp).state); else snprintf(h1_temp, sizeof(h1_temp), "--°");
+      if (!isnan(id(owm_hourly_2_temp).state)) snprintf(h2_temp, sizeof(h2_temp), "%d°", (int) id(owm_hourly_2_temp).state); else snprintf(h2_temp, sizeof(h2_temp), "--°");
+      if (!isnan(id(owm_hourly_3_temp).state)) snprintf(h3_temp, sizeof(h3_temp), "%d°", (int) id(owm_hourly_3_temp).state); else snprintf(h3_temp, sizeof(h3_temp), "--°");
+      if (!isnan(id(owm_hourly_4_temp).state)) snprintf(h4_temp, sizeof(h4_temp), "%d°", (int) id(owm_hourly_4_temp).state); else snprintf(h4_temp, sizeof(h4_temp), "--°");
 
       std::string alarm = is_valid_text(id(budzik_raw).state) ? normalize_alarm(id(budzik_raw).state) : "--:--";
 
@@ -579,9 +599,6 @@ display:
         snprintf(carbuf, sizeof(carbuf), "Zasieg -- km");
       }
 
-      // Ramka zewnetrzna
-      it.rectangle(8, 8, 944, 524, Color::WHITE);
-
       // Header
       if (now.is_valid()) {
         it.strftime(28, 20, id(font_header_date), Color::WHITE, TextAlign::TOP_LEFT, "%d.%m", now);
@@ -603,13 +620,14 @@ display:
       it.line(472, 92, 472, 320, Color::WHITE);
 
       // Lewa gora - outdoor
-      it.print(34, 126, id(mdi_48), Color::WHITE, "\U000F02DC");
+      it.print(34, 126, id(mdi_48), Color::WHITE, "\U000F1C63");
       it.print(96, 118, id(font_temp_main), Color::WHITE, outside_buf);
-      it.print(100, 194, id(font_temp_sub), Color::WHITE, minmax_buf);
+      it.print(100, 202, id(font_temp_sub), Color::WHITE, minmax_buf);
 
       // Prawa gora - indoor
-      it.print(520, 126, id(mdi_48), Color::WHITE, "\U000F1C63");
+      it.print(520, 126, id(mdi_48), Color::WHITE, "\U000F02DC");
       it.print(584, 122, id(font_temp_inside), Color::WHITE, inside_buf);
+      it.print(586, 198, id(font_temp_sub), Color::WHITE, humidity_buf);
 
       // Wschod / zachod
       it.print(528, 204, id(mdi_36), Color::WHITE, "\U000F0599");
@@ -680,8 +698,8 @@ display:
       // Stopka
       it.line(24, 480, 928, 480, Color::WHITE);
 
-      it.print(34, 490, id(mdi_36), Color::WHITE, (!isnan(id(owm_rain_today).state) && id(owm_rain_today).state > 0.1f) ? "\U000F054B" : "\U000F0599");
+      it.print(34, 490, id(mdi_36), Color::WHITE, (!isnan(id(owm_rain_today).state) && id(owm_rain_today).state > 0.1f) ? "\U000F054B" : "\U000F059C");
       it.print(76, 496, id(font_footer), Color::WHITE, rain_text.c_str());
 
-      it.print(704, 490, id(mdi_36), Color::WHITE, "\U000F010B");
+      it.print(704, 490, id(mdi_36), Color::WHITE, "\U000F002E");
       it.print(746, 496, id(font_footer), Color::WHITE, carbuf);
